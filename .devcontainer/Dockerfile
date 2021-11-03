@@ -12,4 +12,9 @@ RUN <<EOF
   chsh --shell /usr/bin/fish
 EOF
 
+RUN <<EOF
+  $INSTALL_PKG mingw-w64
+  rustup target add x86_64-pc-windows-gnu
+EOF
+
 RUN rustup component add rust-analysis rust-src rls rustfmt clippy

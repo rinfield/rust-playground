@@ -10,9 +10,6 @@
   "build": {
     "dockerfile": "Dockerfile",
   },
-  "mounts": [
-    "type=volume,src=rust-playground-target,dst=/workspaces/rust-playground/target"
-  ],
   "extensions": [
     "rust-lang.rust",
     "serayuzgur.crates",
