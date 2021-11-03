@@ -1,0 +1,33 @@
+{
+  "name": "rust-playground",
+  "runArgs": [
+    "--name",
+    "rust-playground",
+    "--hostname",
+    "rust-playground"
+  ],
+  // "image": "local/rust-playground",
+  "build": {
+    "dockerfile": "Dockerfile",
+  },
+  "mounts": [
+    "type=volume,src=rust-playground-target,dst=/workspaces/rust-playground/target"
+  ],
+  "extensions": [
+    "rust-lang.rust",
+    "serayuzgur.crates",
+    "vadimcn.vscode-lldb", // for rust debugger
+    "bungcip.better-toml", // for cargo.toml
+    "editorconfig.editorconfig",
+    "oderwat.indent-rainbow",
+    "vscode-icons-team.vscode-icons"
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "editor.renderWhitespace": "all",
+    "editor.renderControlCharacters": true,
+    "editor.bracketPairColorization.enabled": true,
+    "terminal.integrated.scrollback": 10000,
+    "extensions.ignoreRecommendations": true,
+  }
+}
