@@ -16,7 +16,7 @@ fn main() {
 
     fern::Dispatch::new()
         // Perform allocation-free log formatting
-        .format(|out, message, record| out.finish(format_args!("[{}] {}", record.level(), message)))
+        .format(|out, message, _record| out.finish(format_args!("{}", message)))
         // Add blanket level filter -
         .level(conf_level_filter.unwrap_or(log::LevelFilter::Warn))
         // Output to stdout, files, and other Dispatch configurations
@@ -30,12 +30,11 @@ fn main() {
 }
 
 fn action1() {
-    loop {
-        error!("errorです");
-        warn!("warnです");
-        info!("infoです");
-        debug!("debugです");
-        trace!("traceです");
-        std::thread::sleep(std::time::Duration::from_secs(3));
+    for i in 1.. {
+        error!("{} errorです", i);
+        warn!("{} warnです", i);
+        info!("{} infoです", i);
+        debug!("{} debugです", i);
+        trace!("{} traceです", i);
     }
 }

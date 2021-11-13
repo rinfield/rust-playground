@@ -40,17 +40,38 @@ impl ToWin32<REPORT_EVENT_TYPE> for Level {
     }
 }
 
+/// やや泥臭いApacheと同じ方法できれいにイベントログを出している。
+/// 9個のパラメータを使い切らないので末尾にスペースが入ってしまうが仕方ないか…
+/// -`HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog\Application\${名前}`
+///   - `EventMessageFile` `REG_EXPAND_SZ` `%SystemRoot%\System32\netmsg.dll`
+///   - `TypesSupported` `REG_DWORD` `7`(ERROR | WARN | INFOの値)
+/// ### 参照
+/// - https://www.clear-code.com/blog/2015/9/10.html
+/// - https://github.com/apache/httpd/blob/2.4.16/server/mpm/winnt/nt_eventlog.c
 impl Log for EventlogLogger {
     fn enabled(&self, _metadata: &Metadata) -> bool {
         true // ここはfernが制御
     }
 
     fn log(&self, record: &Record) {
+        let mut wide_level = to_wide(&format!("[{}]", record.level()));
         let mut wide_final_messeage = to_wide(&format!("{}", record.args()));
 
         let category = 0;
-        let event_id = 0;
-        let strings = [PWSTR(wide_final_messeage.as_mut_ptr())];
+        // netmsg.dllの一般的ログメッセージ形式のIDは`3299`
+        // テンプレート: '%1 %2 %3 %4 %5 %6 %7 %8 %9'
+        let event_id = 3299;
+        let strings = [
+            PWSTR(wide_level.as_mut_ptr()),
+            PWSTR(wide_final_messeage.as_mut_ptr()),
+            PWSTR(std::ptr::null_mut()),
+            PWSTR(std::ptr::null_mut()),
+            PWSTR(std::ptr::null_mut()),
+            PWSTR(std::ptr::null_mut()),
+            PWSTR(std::ptr::null_mut()),
+            PWSTR(std::ptr::null_mut()),
+            PWSTR(std::ptr::null_mut()),
+        ];
         let user_sid = PSID::default();
         let num_strings = strings.len().try_into().unwrap();
         let data_size = 0;
