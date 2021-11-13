@@ -42,7 +42,7 @@ impl ToWin32<REPORT_EVENT_TYPE> for Level {
 
 impl Log for EventlogLogger {
     fn enabled(&self, _metadata: &Metadata) -> bool {
-        true
+        true // ここはfernが制御
     }
 
     fn log(&self, record: &Record) {
