@@ -5,9 +5,15 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dependencies]
+log = "0.4"
+fern = "0.6"
+chrono = "0.4"
+
 [dependencies.windows]
-version = "0.24.0"
+version = "0.26.0"
 features = [
+    "std",
     "Win32_Foundation",
     "Win32_System_EventLog",
 ]
