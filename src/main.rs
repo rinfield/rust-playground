@@ -1,5 +1,5 @@
 use log::*;
-use std::env::*;
+// use std::env::*;
 
 mod eventlog;
 
@@ -9,7 +9,8 @@ fn main() {
     // let maybe_level: &str = args.get(1).unwrap_or(&default_level);
     // let level = eventlog::LogLevel::try_from(maybe_level).unwrap_or(eventlog::LogLevel::WARN);
     // println!("maybe_level: {}, level: {:?}", maybe_level, level);
-    // let logger = eventlog::Logger::new("fizzbuzz", eventlog::LogLevel::INFO);
+    let eventlog: std::boxed::Box<dyn log::Log> =
+        Box::new(eventlog::EventlogLogger::new("fizzbuzz"));
 
     fern::Dispatch::new()
         // Perform allocation-free log formatting
@@ -23,10 +24,10 @@ fn main() {
             ))
         })
         // Add blanket level filter -
-        .level(log::LevelFilter::Trace)
+        .level(log::LevelFilter::Warn)
         // Output to stdout, files, and other Dispatch configurations
         .chain(std::io::stdout())
-        .chain(fern::log_file("output.log").unwrap())
+        .chain(eventlog)
         // Apply globally
         .apply()
         .unwrap();

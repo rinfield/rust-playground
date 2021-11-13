@@ -1,114 +1,83 @@
+use log::*;
 use std::ffi::OsString;
 use std::os::windows::ffi::OsStrExt;
 use windows::Win32::Foundation::*;
 use windows::Win32::System::EventLog::*;
 
-#[derive(Debug)]
-pub enum LogLevel {
-    ERROR,
-    WARN,
-    INFO,
-    DEBUG,
-}
-
-impl LogLevel {
-    fn as_win32(&self) -> REPORT_EVENT_TYPE {
-        match *self {
-            LogLevel::ERROR => EVENTLOG_ERROR_TYPE,
-            LogLevel::WARN => EVENTLOG_WARNING_TYPE,
-            LogLevel::INFO => EVENTLOG_INFORMATION_TYPE,
-            LogLevel::DEBUG => EVENTLOG_INFORMATION_TYPE,
-        }
-    }
-}
-
-impl std::convert::TryFrom<&str> for LogLevel {
-    type Error = &'static str;
-
-    fn try_from(name: &str) -> Result<Self, Self::Error> {
-        match name.to_ascii_uppercase() {
-            name if name == LogLevel::ERROR.to_string() => Ok(LogLevel::ERROR),
-            name if name == LogLevel::WARN.to_string() => Ok(LogLevel::WARN),
-            name if name == LogLevel::INFO.to_string() => Ok(LogLevel::INFO),
-            name if name == LogLevel::DEBUG.to_string() => Ok(LogLevel::DEBUG),
-            _ => Err("unknown type"),
-        }
-    }
-}
-
-impl std::fmt::Display for LogLevel {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-pub struct Logger {
-    name: Vec<u16>, // 保持しておかないとRegisterEventSourceの名前のライフタイムが合わない
+pub struct EventlogLogger {
+    pub name: Vec<u16>, // 保持しておかないとRegisterEventSourceの名前のライフタイムが合わない
     handle: EventSourceHandle,
-    level: LogLevel,
 }
 
-impl Logger {
-    pub fn new(name: &str, level: LogLevel) -> Logger {
+impl EventlogLogger {
+    pub fn new(name: &str) -> Self {
         let localhost = PWSTR::default();
         let mut wide_name = to_wide(name);
         let event_source_handle;
         unsafe {
             event_source_handle = RegisterEventSourceW(localhost, PWSTR(wide_name.as_mut_ptr()))
         };
-        Logger {
+        EventlogLogger {
             name: wide_name,
             handle: event_source_handle,
-            level: level,
         }
     }
+}
 
-    pub fn error(&self, message: &str) {
-        self.log(LogLevel::ERROR, message);
+trait ToWin32<T> {
+    fn to_win32(&self) -> T;
+}
+
+impl ToWin32<REPORT_EVENT_TYPE> for Level {
+    fn to_win32(&self) -> REPORT_EVENT_TYPE {
+        match *self {
+            Level::Error => EVENTLOG_ERROR_TYPE,
+            Level::Warn => EVENTLOG_WARNING_TYPE,
+            Level::Info => EVENTLOG_INFORMATION_TYPE,
+            Level::Debug => EVENTLOG_INFORMATION_TYPE,
+            Level::Trace => EVENTLOG_INFORMATION_TYPE,
+        }
+    }
+}
+
+impl Log for EventlogLogger {
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
     }
 
-    pub fn warn(&self, message: &str) {
-        self.log(LogLevel::WARN, message);
-    }
+    fn log(&self, record: &Record) {
+        let mut wide_final_messeage = to_wide(&format!("{}", record.args()));
 
-    pub fn info(&self, message: &str) {
-        self.log(LogLevel::INFO, message);
-    }
-
-    pub fn debug(&self, message: &str) {
-        self.log(LogLevel::DEBUG, message);
-    }
-
-    pub fn log(&self, level: LogLevel, message: &str) {
         let category = 0;
         let event_id = 0;
+        let strings = [PWSTR(wide_final_messeage.as_mut_ptr())];
         let user_sid = PSID::default();
-        let strings = [PWSTR(
-            to_wide(&format!("[{}] {}", level, message)).as_mut_ptr(),
-        )];
+        let num_strings = strings.len().try_into().unwrap();
         let data_size = 0;
         let data = std::ptr::null();
         unsafe {
             ReportEventW(
                 HANDLE(self.handle.0),
-                level.as_win32(),
+                record.level().to_win32(),
                 category,
                 event_id,
                 user_sid,
-                strings.len().try_into().unwrap(),
+                num_strings,
                 data_size,
                 strings.as_ptr(),
                 data,
             );
         };
     }
+
+    fn flush(&self) {}
 }
 
-impl Drop for Logger {
+impl Drop for EventlogLogger {
     fn drop(&mut self) {
         let result;
         unsafe { result = DeregisterEventSource(self.handle) };
-        println!("Logger Drop Success?: {}", result.as_bool());
+        println!("EventlogLogger Drop Success?: {}", result.as_bool());
     }
 }
 
