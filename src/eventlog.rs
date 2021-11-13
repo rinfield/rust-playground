@@ -1,3 +1,22 @@
+//! Windowsイベントログに出力するロガー実装です。
+//!
+//! ## 仕組み
+//! - レガシーではありますがツールを必要としないためEvent Logging API(not Windows Event Log API)を使用しています。
+//! - イベントログにきれいに出力するためにはログメッセージテンプレートの定義が必要ですがこれを省略するため、Windowsに同梱されている`netmsg.dll`を流用します。
+//! - `netmsg.dll`のイベントID`3299`は9個のパラメータをスペースで区切った汎用的なテンプレートです。
+//!   - テンプレート: `%1 %2 %3 %4 %5 %6 %7 %8 %9`
+//!   - 9個のパラメータを使い切らないので末尾にスペースが入ってしまいますがこれは仕方がないものとします。
+//!
+//! ## 事前に設定が必要なレジストリ
+//! -`HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog\Application\${名前}`
+//!   - `EventMessageFile` `REG_EXPAND_SZ` `%SystemRoot%\System32\netmsg.dll`
+//!   - `TypesSupported` `REG_DWORD` `7`(ERROR | WARN | INFOの値)
+//!
+//! ## 参照
+//! - https://www.clear-code.com/blog/2015/9/10.html
+//! - https://docs.microsoft.com/en-us/windows/win32/eventlog/event-sources
+//! - https://github.com/apache/httpd/blob/2.4.16/server/mpm/winnt/nt_eventlog.c
+
 use log::*;
 use std::ffi::OsString;
 use std::os::windows::ffi::OsStrExt;
@@ -5,21 +24,23 @@ use windows::Win32::Foundation::*;
 use windows::Win32::System::EventLog::*;
 
 pub struct EventlogLogger {
-    pub name: Vec<u16>, // 保持しておかないとRegisterEventSourceの名前のライフタイムが合わない
+    /// イベントログのアプリケーション名です。
+    /// 保持しておかないとRegisterEventSourceで指定したポインタが消えるためここで保持します
+    #[allow(dead_code)]
+    wide_app_name: Vec<u16>,
+    /// イベントログのソースハンドルです。
     handle: EventSourceHandle,
 }
 
 impl EventlogLogger {
-    pub fn new(name: &str) -> Self {
+    pub fn new(app_name: &str) -> Self {
         let localhost = PWSTR::default();
-        let mut wide_name = to_wide(name);
-        let event_source_handle;
-        unsafe {
-            event_source_handle = RegisterEventSourceW(localhost, PWSTR(wide_name.as_mut_ptr()))
-        };
+        let mut wide_app_name = to_wide(app_name);
+        let handle;
+        unsafe { handle = RegisterEventSourceW(localhost, PWSTR(wide_app_name.as_mut_ptr())) };
         EventlogLogger {
-            name: wide_name,
-            handle: event_source_handle,
+            wide_app_name,
+            handle,
         }
     }
 }
@@ -29,6 +50,8 @@ trait ToWin32<T> {
 }
 
 impl ToWin32<REPORT_EVENT_TYPE> for Level {
+    /// log crateのレベルをイベントログの対応するレベルに変換します。
+    /// Debug以下のレベルはイベントログには存在しないため、Infoレベルとして扱います。
     fn to_win32(&self) -> REPORT_EVENT_TYPE {
         match *self {
             Level::Error => EVENTLOG_ERROR_TYPE,
@@ -40,17 +63,9 @@ impl ToWin32<REPORT_EVENT_TYPE> for Level {
     }
 }
 
-/// やや泥臭いApacheと同じ方法できれいにイベントログを出している。
-/// 9個のパラメータを使い切らないので末尾にスペースが入ってしまうが仕方ないか…
-/// -`HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog\Application\${名前}`
-///   - `EventMessageFile` `REG_EXPAND_SZ` `%SystemRoot%\System32\netmsg.dll`
-///   - `TypesSupported` `REG_DWORD` `7`(ERROR | WARN | INFOの値)
-/// ### 参照
-/// - https://www.clear-code.com/blog/2015/9/10.html
-/// - https://github.com/apache/httpd/blob/2.4.16/server/mpm/winnt/nt_eventlog.c
 impl Log for EventlogLogger {
     fn enabled(&self, _metadata: &Metadata) -> bool {
-        true // ここはfernが制御
+        true // ここはfernが制御するので常にtrue
     }
 
     fn log(&self, record: &Record) {
@@ -58,19 +73,17 @@ impl Log for EventlogLogger {
         let mut wide_final_messeage = to_wide(&format!("{}", record.args()));
 
         let category = 0;
-        // netmsg.dllの一般的ログメッセージ形式のIDは`3299`
-        // テンプレート: '%1 %2 %3 %4 %5 %6 %7 %8 %9'
         let event_id = 3299;
         let strings = [
             PWSTR(wide_level.as_mut_ptr()),
             PWSTR(wide_final_messeage.as_mut_ptr()),
-            PWSTR(std::ptr::null_mut()),
-            PWSTR(std::ptr::null_mut()),
-            PWSTR(std::ptr::null_mut()),
-            PWSTR(std::ptr::null_mut()),
-            PWSTR(std::ptr::null_mut()),
-            PWSTR(std::ptr::null_mut()),
-            PWSTR(std::ptr::null_mut()),
+            PWSTR::default(),
+            PWSTR::default(),
+            PWSTR::default(),
+            PWSTR::default(),
+            PWSTR::default(),
+            PWSTR::default(),
+            PWSTR::default(),
         ];
         let user_sid = PSID::default();
         let num_strings = strings.len().try_into().unwrap();
@@ -91,7 +104,9 @@ impl Log for EventlogLogger {
         };
     }
 
-    fn flush(&self) {}
+    fn flush(&self) {
+        // イベントログにflushしなければならない処理はないはず
+    }
 }
 
 impl Drop for EventlogLogger {
