@@ -13,7 +13,6 @@ fn main() {
     let eventlog: std::boxed::Box<dyn log::Log> =
         Box::new(eventlog::EventlogLogger::new("fizzbuzz"));
     fern::Dispatch::new()
-        .format(|out, message, _record| out.finish(format_args!("{}", message)))
         .level(conf_level_filter.unwrap_or(log::LevelFilter::Warn))
         .chain(eventlog)
         .apply()
