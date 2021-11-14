@@ -35,7 +35,7 @@ pub struct EventlogLogger {
 impl EventlogLogger {
     pub fn new(app_name: &str) -> Self {
         let localhost = PWSTR::default();
-        let mut wide_app_name = to_wide(app_name);
+        let mut wide_app_name = app_name.to_win32();
         let handle;
         unsafe { handle = RegisterEventSourceW(localhost, PWSTR(wide_app_name.as_mut_ptr())) };
         EventlogLogger {
@@ -63,24 +63,40 @@ impl ToWin32<REPORT_EVENT_TYPE> for Level {
     }
 }
 
+impl<T> ToWin32<Vec<u16>> for T
+where
+    T: AsRef<str>,
+{
+    fn to_win32(&self) -> Vec<u16> {
+        OsString::from(self.as_ref())
+            .encode_wide()
+            .chain(Some(0))
+            .collect::<Vec<u16>>()
+    }
+}
+
 impl Log for EventlogLogger {
     fn enabled(&self, _metadata: &Metadata) -> bool {
         true // ここはfernが制御するので常にtrue
     }
 
     fn log(&self, record: &Record) {
-        let mut wide_level = to_wide(&format!("[{}]", record.level()));
-        let mut wide_final_messeage = to_wide(&format!("{}", record.args()));
+        let mut level_key = "Log level:".to_win32();
+        let mut level_value = format!("{},", record.level()).to_win32();
+        let mut thread_key = "Thread:".to_win32();
+        let mut thread_value = format!("{:?},", std::thread::current().id()).to_win32();
+        let mut message_key = "Message:".to_win32();
+        let mut message_value = format!("{}", record.args()).to_win32();
 
         let category = 0;
         let event_id = 3299;
-        let strings = [
-            PWSTR(wide_level.as_mut_ptr()),
-            PWSTR(wide_final_messeage.as_mut_ptr()),
-            PWSTR::default(),
-            PWSTR::default(),
-            PWSTR::default(),
-            PWSTR::default(),
+        let strings: [PWSTR; 9] = [
+            PWSTR(level_key.as_mut_ptr()),
+            PWSTR(level_value.as_mut_ptr()),
+            PWSTR(thread_key.as_mut_ptr()),
+            PWSTR(thread_value.as_mut_ptr()),
+            PWSTR(message_key.as_mut_ptr()),
+            PWSTR(message_value.as_mut_ptr()),
             PWSTR::default(),
             PWSTR::default(),
             PWSTR::default(),
@@ -115,11 +131,4 @@ impl Drop for EventlogLogger {
         unsafe { result = DeregisterEventSource(self.handle) };
         println!("EventlogLogger Drop Success?: {}", result.as_bool());
     }
-}
-
-fn to_wide(str: &str) -> Vec<u16> {
-    OsString::from(str)
-        .encode_wide()
-        .chain(Some(0))
-        .collect::<Vec<u16>>()
 }
