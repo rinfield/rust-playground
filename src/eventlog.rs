@@ -23,11 +23,13 @@ use std::os::windows::ffi::OsStrExt;
 use windows::Win32::Foundation::*;
 use windows::Win32::System::EventLog::*;
 
+type WSTR = Vec<u16>;
+
 pub struct EventlogLogger {
     /// イベントログのアプリケーション名です。
     /// 保持しておかないとRegisterEventSourceで指定したポインタが消えるためここで保持します
     #[allow(dead_code)]
-    wide_app_name: Vec<u16>,
+    wide_app_name: WSTR,
     /// イベントログのソースハンドルです。
     handle: EventSourceHandle,
 }
@@ -53,7 +55,7 @@ impl ToWin32<REPORT_EVENT_TYPE> for Level {
     /// log crateのレベルをイベントログの対応するレベルに変換します。
     /// Debug以下のレベルはイベントログには存在しないため、Infoレベルとして扱います。
     fn to_win32(&self) -> REPORT_EVENT_TYPE {
-        match *self {
+        match self {
             Level::Error => EVENTLOG_ERROR_TYPE,
             Level::Warn => EVENTLOG_WARNING_TYPE,
             Level::Info => EVENTLOG_INFORMATION_TYPE,
@@ -63,15 +65,12 @@ impl ToWin32<REPORT_EVENT_TYPE> for Level {
     }
 }
 
-impl<T> ToWin32<Vec<u16>> for T
-where
-    T: AsRef<str>,
-{
-    fn to_win32(&self) -> Vec<u16> {
+impl<T: AsRef<str>> ToWin32<WSTR> for T {
+    fn to_win32(&self) -> WSTR {
         OsString::from(self.as_ref())
             .encode_wide()
-            .chain(Some(0))
-            .collect::<Vec<u16>>()
+            .chain(std::iter::once(0))
+            .collect()
     }
 }
 
