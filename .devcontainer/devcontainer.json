@@ -10,10 +10,12 @@
   "build": {
     "dockerfile": "Dockerfile",
   },
+  "mounts": [
+    "type=volume,src=workspace_target,dst=${containerWorkspaceFolder}/target"
+  ],
   "extensions": [
     "rust-lang.rust",
     "serayuzgur.crates",
-    "vadimcn.vscode-lldb", // for rust debugger
     "bungcip.better-toml", // for cargo.toml
     "editorconfig.editorconfig",
     "oderwat.indent-rainbow",
