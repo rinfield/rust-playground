@@ -1,32 +1,29 @@
 {
   "name": "rust-playground",
-  "runArgs": [
-    "--name",
-    "rust-playground",
-    "--hostname",
-    "rust-playground"
-  ],
-  // "image": "local/rust-playground",
   "build": {
-    "dockerfile": "Dockerfile",
+    "dockerfile": "Dockerfile"
   },
   "mounts": [
     "type=volume,src=workspace_target,dst=${containerWorkspaceFolder}/target"
   ],
-  "extensions": [
-    "rust-lang.rust",
-    "serayuzgur.crates",
-    "bungcip.better-toml", // for cargo.toml
-    "editorconfig.editorconfig",
-    "oderwat.indent-rainbow",
-    "vscode-icons-team.vscode-icons"
-  ],
-  "settings": {
-    "editor.formatOnSave": true,
-    "editor.renderWhitespace": "all",
-    "editor.renderControlCharacters": true,
-    "editor.bracketPairColorization.enabled": true,
-    "terminal.integrated.scrollback": 10000,
-    "extensions.ignoreRecommendations": true,
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode-remote.remote-containers",
+        "editorconfig.editorconfig",
+        "oderwat.indent-rainbow",
+        "rust-lang.rust-analyzer",
+        "serayuzgur.crates",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.renderWhitespace": "all",
+        "editor.renderControlCharacters": true,
+        "editor.bracketPairColorization.enabled": true,
+        "terminal.integrated.scrollback": 10000,
+        "extensions.ignoreRecommendations": true
+      }
+    }
   }
 }
